@@ -1,0 +1,207 @@
+Page
+
+<apex:page controller="MyRelatedNotesController">
+    <apex:form>
+        <apex:pageBlock id="listSec">
+        <apex:actionFunction name="getDetails" action="{!getDetails}"/>
+            <apex:pageBlockSection>
+            <apex:pageBLockSectionItem>
+                Enter User Id
+                <br/>
+                <apex:inputText value="{!userId}"/> 
+            </apex:pageBLockSectionItem>
+            <apex:pageBLockSectionItem>
+                Enter Type
+                <br/>
+                <apex:inputText value="{!noteType}"/> 
+            </apex:pageBLockSectionItem>
+            <apex:pageBLockSectionItem>
+                <apex:commandButton value="Process" action="{!process}"/> 
+            </apex:pageBLockSectionItem>
+        </apex:pageBlockSection>
+        <apex:outputPanel id="recList">
+             <apex:outputPanel rendered="{!recList.size>0}">
+                 <apex:selectList size="1" value="{!selectedRecId}" onclick="getDetails();">	
+            		<apex:selectOptions value="{!recList}">
+            		</apex:selectOptions>
+        		</apex:selectList>
+            </apex:outputPanel>
+        </apex:outputPanel>
+        <apex:outputPanel id="recPanel">
+            <apex:outputPanel rendered="{!noteList.size>0}">
+                <apex:pageBlockSection columns="6">
+                    <apex:pageBlockSectionItem>
+                        Action
+                    </apex:pageBlockSectionItem>
+                    <apex:pageBlockSectionItem>
+                        Note Name
+                    </apex:pageBlockSectionItem>
+                    <apex:pageBlockSectionItem>
+                        Type
+                    </apex:pageBlockSectionItem>
+                    <apex:pageBlockSectionItem>
+                        Date
+                    </apex:pageBlockSectionItem>
+                    <apex:pageBlockSectionItem>
+                        Description
+                    </apex:pageBlockSectionItem>
+                    <apex:pageBlockSectionItem>
+                        Owner
+                    </apex:pageBlockSectionItem>
+                </apex:pageBlockSection>
+                <apex:repeat value="{!noteList}" var="nRecList">
+                    <apex:pageBlockSection>
+                        <apex:pageBlockSectionItem>
+                             <a href="javascript:void(0);" onclick="editValues();" rendered="{!displayAction}">Edit</a>
+                        </apex:pageBlockSectionItem>
+                        <apex:pageBlockSectionItem>
+                            <apex:inputField value="{!nRecList.Name}"/>
+                        </apex:pageBlockSectionItem>
+                        <apex:pageBlockSectionItem>
+                            {!selectedRecId}
+                        </apex:pageBlockSectionItem>
+                        <apex:pageBlockSectionItem>
+                            <apex:inputField value="{!nRecList.Date__c}"/>
+                        </apex:pageBlockSectionItem>
+                        <apex:pageBlockSectionItem>
+                            <apex:inputField value="{!nRecList.Description__c}"/>
+                        </apex:pageBlockSectionItem>
+                        <apex:pageBlockSectionItem>
+                            <apex:inputField value="{!nRecList.OwnerId}"/>
+                        </apex:pageBlockSectionItem>
+                    </apex:pageBlockSection>
+                </apex:repeat>
+            </apex:outputPanel>
+        </apex:outputPanel>
+    </apex:pageBlock>
+    </apex:form>
+</apex:page>
+
+controller
+
+public class MyRelatedNotesController {
+    public Id userId {get; set;}
+    public String noteType {get; set;}
+    public String selectedRecId {get; set;}
+    public Boolean displayAction {get; set;}
+    public Set<Id> accId;
+    public Set<Id> oppId;
+    public Set<Id> caseId;
+    public List<Note__c> notelist {get; set;}
+    public List<SelectOption> recList {get; set;}
+    public MyRelatedNotesController()
+    {
+        recList = new List<SelectOption>();
+        noteList = new List<Note__c>();
+        displayAction = false;
+        accId = new Set<Id>();
+        oppId = new Set<Id>();
+        caseId = new Set<Id>();
+        for(Note__c note : [SELECT Id, Account__c, Opportunity__c, Case__c
+                            FROM Note__c
+                            WHERE Account__c!= NULL
+                            OR Opportunity__c!= NULL
+                            OR Case__c!= NULL])
+        {
+            if(note.Account__c != NULL)
+            {
+                accId.add(note.Account__c);
+            }
+            if(note.Opportunity__c != NULL)
+            {
+                oppId.add(note.Opportunity__c);
+            }
+            if(note.Case__c != NULL)
+            {
+                caseId.add(note.Case__c);
+            }
+        }
+    }
+    public void process()
+    {
+        if(userId == NULL)
+        {
+            userId = UserInfo.getUserId();
+        }
+        if(noteType == NULL)
+        {
+            noteType = 'Opportunity';
+        }
+        if(noteType.capitalize() == 'Account')
+        {
+            system.debug('in if loop');
+            for(Account acc : [SELECT Id, Name
+                               FROM Account
+                               WHERE Id IN : accId])
+            {
+                system.debug('in for loop');
+                recList.add(new SelectOption(acc.Id, acc.Name));
+            }
+            system.debug(recList);
+        }
+        if(noteType.capitalize() == 'Opportunity')
+        {
+            for(Opportunity opp : [SELECT Id, Name
+                                   FROM Opportunity
+                                   WHERE Id IN : oppId])
+            {
+                recList.add(new SelectOption(opp.Id, opp.Name));
+            }
+        }
+        if(noteType.capitalize() == 'Case')
+        {
+            for(Case caseRec : [SELECT Id, CaseNumber
+                                FROM Case
+                                WHERE Id IN : caseId])
+            {
+                recList.add(new SelectOption(caseRec.Id, caseRec.CaseNumber));
+            }
+        }
+    }
+    public void getDetails()
+    {
+        if(noteType.capitalize() == 'Account')
+        {
+            for(Note__c note : [SELECT Id, Name, Date__c, Description__c, OwnerId
+                                FROM Note__c
+                                WHERE Account__c =: selectedRecId])
+            {
+                noteList.add(note);
+                if(note.OwnerId == userId)
+                {
+                    displayAction = true;
+                }
+            }
+        }
+        if(noteType.capitalize() == 'Opportunity')
+        {
+            for(Note__c note : [SELECT Id, Name, Date__c, Description__c, OwnerId
+                                FROM Note__c
+                                WHERE Opportunity__c =: selectedRecId])
+            {
+                noteList.add(note);
+                if(note.OwnerId == userId)
+                {
+                    displayAction = true;
+                }
+            }
+        }
+        if(noteType.capitalize() == 'Case')
+        {
+            for(Note__c note : [SELECT Id, Name, Date__c, Description__c, OwnerId
+                                FROM Note__c
+                                WHERE Case__c =: selectedRecId])
+            {
+                noteList.add(note);
+                if(note.OwnerId == userId)
+                {
+                    displayAction = true;
+                }
+            }
+        }
+    }
+    public void editValues()
+    {
+        
+    }
+}
